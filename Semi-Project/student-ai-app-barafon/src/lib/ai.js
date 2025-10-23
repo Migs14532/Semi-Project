@@ -2,7 +2,7 @@ import { GoogleGenAI } from "@google/genai";
 import supabase from "./supabase";
 
 // ✅ Initialize Gemini AI using @google/genai
-const ai = new GoogleGenAI({ apiKey: "AIzaSyAHXssCQYVIxQAlNkOT1LEouaaiq10FNb8", });
+const ai = new GoogleGenAI({ apiKey: "", });
 
 /**
  * Analyzes student performance for a specific subject using Gemini AI
@@ -198,3 +198,4 @@ function createFallbackAnalysis(studentsWithGrades, subjectData) {
     ],
   };
 }
+
