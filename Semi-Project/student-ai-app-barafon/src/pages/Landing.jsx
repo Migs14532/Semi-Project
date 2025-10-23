@@ -61,7 +61,7 @@ export default function Landing() {
             </h2>
 
             <p className="text-gray-800 leading-relaxed mb-6 max-w-2xl mx-auto text-lg"> 
-              My IT journey was hard because I didn't have any background in coding before college but I really wanted to learn and explore about it because it is my passion and, actually this is my dream course as well.
+              My IT journey was hard because I didn't have any knowledge and background in coding before college but I really wanted to learn and explore about it because it is my passion and, actually this is my dream course as well.
             </p>
             <p className="text-black leading-relaxed mb-10 max-w-2xl mx-auto text-2xl font-bold">
               IT NGANI!
@@ -73,4 +73,5 @@ export default function Landing() {
       <p className="text-center py-6 text-gray-600 text-sm">© 2025 Miguel Paolo Barafon. All rights reserved.</p>
     </div>
   );
+
 }
