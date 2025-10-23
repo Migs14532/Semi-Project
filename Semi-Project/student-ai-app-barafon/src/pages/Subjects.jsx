@@ -1,16 +1,58 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import supabase from '../lib/supabase.js';
+import toast from "react-hot-toast";
+
 
 export default function Subjects() {
   const [subjects, setSubjects] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [formData, setFormData] = useState({ code: "", title: "" });
+  const [formData, setFormData] = useState({ 
+    subject_code: "", 
+    subject_name: "",
+    instructor: "" 
+  });
   const [editingIndex, setEditingIndex] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  // Fetch subjects from Supabase on component mount
+  useEffect(() => {
+    fetchSubjects();
+  }, []);
+
+  const fetchSubjects = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('subjects')
+        .select('*')
+        .order('subject_code', { ascending: true });
+      
+      if (error) throw error;
+      setSubjects(data || []);
+    } catch (error) {
+      console.error('Error fetching subjects:', error);
+      toast.error('Error loading subjects: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleOpenModal = (index = null) => {
     setEditingIndex(index);
-    if (index !== null) setFormData(subjects[index]);
-    else setFormData({ code: "", title: "" });
+    if (index !== null) {
+      setFormData({
+        subject_code: subjects[index].subject_code,
+        subject_name: subjects[index].subject_name,
+        instructor: subjects[index].instructor
+      });
+    } else {
+      setFormData({ 
+        subject_code: "", 
+        subject_name: "",
+        instructor: "" 
+      });
+    }
     setIsModalOpen(true);
   };
 
@@ -23,20 +65,70 @@ export default function Subjects() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (editingIndex !== null) {
-      const updated = [...subjects];
-      updated[editingIndex] = formData;
-      setSubjects(updated);
-    } else {
-      setSubjects([...subjects, formData]);
+    setLoading(true);
+
+    try {
+      if (editingIndex !== null) {
+        // Update existing subject
+        const { error } = await supabase
+          .from('subjects')
+          .update({
+            subject_code: formData.subject_code,
+            subject_name: formData.subject_name,
+            instructor: formData.instructor
+          })
+          .eq('id', subjects[editingIndex].id);
+
+        if (error) throw error;
+        toast.success('Subject updated successfully!');
+      } else {
+        // Add new subject
+        const { error } = await supabase
+          .from('subjects')
+          .insert([{
+            subject_code: formData.subject_code,
+            subject_name: formData.subject_name,
+            instructor: formData.instructor
+          }]);
+
+        if (error) throw error;
+        toast.success('Subject added successfully!');
+      }
+
+      await fetchSubjects(); // Refresh the list
+      handleCloseModal();
+    } catch (error) {
+      console.error('Error saving subject:', error);
+      toast.error('Error saving subject: ' + error.message);
+    } finally {
+      setLoading(false);
     }
-    handleCloseModal();
   };
 
-  const handleDelete = (index) => {
-    setSubjects(subjects.filter((_, i) => i !== index));
+  const handleDelete = async (index) => {
+    if (!window.confirm('Are you sure you want to delete this subject?')) {
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('subjects')
+        .delete()
+        .eq('id', subjects[index].id);
+
+      if (error) throw error;
+      
+      toast.success('Subject deleted successfully!');
+      await fetchSubjects(); // Refresh the list
+    } catch (error) {
+      console.error('Error deleting subject:', error);
+      toast.error('Error deleting subject: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -53,7 +145,7 @@ export default function Subjects() {
               to="/"
               className="text-white hover:text-gray-300 font-medium transition-colors px-4 py-2 border border-white rounded-lg hover:bg-white hover:text-black"
             >
-              Back to Home
+              ← Back to Home
             </Link>
           </div>
         </div>
@@ -62,12 +154,18 @@ export default function Subjects() {
         <div className="bg-white p-8 rounded-b-3xl shadow-xl border-x border-b border-gray-200">
           <button
             onClick={() => handleOpenModal()}
-            className="mb-6 px-6 py-3 bg-black text-white rounded-xl hover:bg-gray-800 transition-all duration-300 shadow-lg hover:shadow-2xl hover:-translate-y-0.5 font-medium"
+            className="cursor-pointer mb-6 px-6 py-3 bg-black text-white rounded-xl hover:bg-gray-800 transition-all duration-300 shadow-lg hover:shadow-2xl hover:-translate-y-0.5 font-medium disabled:opacity-50"
+            disabled={loading}
           >
-            Add New Subject
+            + Add New Subject
           </button>
 
-          {subjects.length === 0 ? (
+          {loading ? (
+            <div className="text-center py-16">
+              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-black"></div>
+              <p className="mt-4 text-gray-600">Loading...</p>
+            </div>
+          ) : subjects.length === 0 ? (
             <div className="text-center py-16 border-2 border-dashed border-gray-300 rounded-2xl">
               <svg className="w-16 h-16 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
@@ -81,26 +179,30 @@ export default function Subjects() {
                 <thead className="bg-black text-white">
                   <tr>
                     <th className="p-4 text-left font-semibold">Subject Code</th>
-                    <th className="p-4 text-left font-semibold">Subject Title</th>
+                    <th className="p-4 text-left font-semibold">Subject Name</th>
+                    <th className="p-4 text-left font-semibold">Instructor</th>
                     <th className="p-4 text-center font-semibold">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {subjects.map((subject, i) => (
-                    <tr key={i} className="hover:bg-gray-50 transition-colors">
-                      <td className="p-4 font-bold text-black">{subject.code}</td>
-                      <td className="p-4 text-gray-700">{subject.title}</td>
+                    <tr key={subject.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="p-4 font-bold text-black">{subject.subject_code}</td>
+                      <td className="p-4 text-gray-700">{subject.subject_name}</td>
+                      <td className="p-4 text-gray-700">{subject.instructor}</td>
                       <td className="p-4 text-center">
                         <div className="flex justify-center gap-2">
                           <button
                             onClick={() => handleOpenModal(i)}
-                            className="px-4 py-2 bg-white text-black border-2 border-black rounded-lg hover:bg-black hover:text-white transition-all duration-300 font-medium"
+                            className="cursor-pointer px-4 py-2 bg-white text-black border-2 border-black rounded-lg hover:bg-black hover:text-white transition-all duration-300 font-medium disabled:opacity-50"
+                            disabled={loading}
                           >
                             Edit
                           </button>
                           <button
                             onClick={() => handleDelete(i)}
-                            className="px-4 py-2 bg-black text-white rounded-lg hover:bg-red-600 transition-all duration-300 font-medium"
+                            className="cursor-pointer px-4 py-2 bg-black text-white rounded-lg hover:bg-red-600 transition-all duration-300 font-medium disabled:opacity-50"
+                            disabled={loading}
                           >
                             Delete
                           </button>
@@ -133,27 +235,42 @@ export default function Subjects() {
               {/* Modal Body */}
               <div className="p-6 space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Subject Code</label>
+                  <label className="block text-sm text-gray-700 mb-2">Subject Code</label>
                   <input
                     type="text"
-                    name="code"
-                    placeholder="e.g., IT101"
-                    value={formData.code}
-                    onChange={handleChange}
-                    className="w-full p-3 border-2 border-gray-300 rounded-xl focus:border-black focus:outline-none transition-colors font-mono font-bold"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Subject Title</label>
-                  <input
-                    type="text"
-                    name="title"
-                    placeholder="e.g., Introduction to Programming"
-                    value={formData.title}
+                    name="subject_code"
+                    placeholder="e.g., IT PROF ELEC1"
+                    value={formData.subject_code}
                     onChange={handleChange}
                     className="w-full p-3 border-2 border-gray-300 rounded-xl focus:border-black focus:outline-none transition-colors"
                     required
+                    disabled={loading}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-700 mb-2">Subject Name</label>
+                  <input
+                    type="text"
+                    name="subject_name"
+                    placeholder="e.g., IT Professional Elective1"
+                    value={formData.subject_name}
+                    onChange={handleChange}
+                    className="w-full p-3 border-2 border-gray-300 rounded-xl focus:border-black focus:outline-none transition-colors"
+                    required
+                    disabled={loading}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Instructor</label>
+                  <input
+                    type="text"
+                    name="instructor"
+                    placeholder="e.g., Prof. Lloyd Semblante"
+                    value={formData.instructor}
+                    onChange={handleChange}
+                    className="w-full p-3 border-2 border-gray-300 rounded-xl focus:border-black focus:outline-none transition-colors"
+                    required
+                    disabled={loading}
                   />
                 </div>
               </div>
@@ -163,15 +280,17 @@ export default function Subjects() {
                 <button
                   type="button"
                   onClick={handleCloseModal}
-                  className="px-6 py-3 bg-white text-black border-2 border-gray-300 rounded-xl hover:bg-gray-100 transition-all duration-300 font-medium"
+                  className="px-6 py-3 bg-white text-black border-2 border-gray-300 rounded-xl hover:bg-gray-100 transition-all duration-300 font-medium disabled:opacity-50"
+                  disabled={loading}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-3 bg-black text-white rounded-xl hover:bg-gray-800 transition-all duration-300 shadow-lg font-medium"
+                  className="px-6 py-3 bg-black text-white rounded-xl hover:bg-gray-800 transition-all duration-300 shadow-lg font-medium disabled:opacity-50"
+                  disabled={loading}
                 >
-                  {editingIndex !== null ? "Update" : "Add Subject"}
+                  {loading ? 'Saving...' : editingIndex !== null ? "Update" : "Add Subject"}
                 </button>
               </div>
             </form>
